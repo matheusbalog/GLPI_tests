@@ -1,0 +1,93 @@
+services:
+  # -------------------------------------------------------------
+  # 1. Banco de Dados do Workflow (Persistência de Estado e Auditoria)
+  # -------------------------------------------------------------
+  workflow-db:
+    image: postgres:16-alpine
+    container_name: workflow-postgres
+    environment:
+      POSTGRES_DB: workflow_db
+      POSTGRES_USER: workflow_user
+      POSTGRES_PASSWORD: workflow_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - workflow_pgdata:/var/lib/postgresql/data
+    networks:
+      - triage-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workflow_user -d workflow_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------------------------------------------
+  # 2. Mock / Instância Local do GLPI 10.0.5 e seu Banco MariaDB
+  # -------------------------------------------------------------
+  glpi-db:
+    image: mariadb:10.11
+    container_name: glpi-mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpassword
+      MARIADB_DATABASE: glpidb
+      MARIADB_USER: glpi_user
+      MARIADB_PASSWORD: glpipassword
+    volumes:
+      - glpi_dbdata:/var/lib/mysql
+    networks:
+      - triage-net
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  glpi:
+    image: diouxx/glpi:10.0.5
+    container_name: glpi-app
+    ports:
+      - "8080:80"
+    environment:
+      TIMEZONE: "America/Sao_Paulo"
+    depends_on:
+      glpi-db:
+        condition: service_healthy
+    volumes:
+      - glpi_data:/var/www/html/glpi
+    networks:
+      - triage-net
+
+  # -------------------------------------------------------------
+  # 3. Backend de Orquestração (Modular Monolith: LangGraph + FastAPI)
+  # -------------------------------------------------------------
+  workflow-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: workflow-core
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "postgresql+psycopg://workflow_user:workflow_password@workflow-db:5432/workflow_db"
+      GLPI_BASE_URL: "http://glpi/apirest.php"
+      GLPI_APP_TOKEN: "${GLPI_APP_TOKEN:-}"
+      GLPI_USER_TOKEN: "${GLPI_USER_TOKEN:-}"
+      AWS_DEFAULT_REGION: "${AWS_DEFAULT_REGION:-us-east-1}"
+    volumes:
+      - .:/app
+    depends_on:
+      workflow-db:
+        condition: service_healthy
+      glpi:
+        condition: service_started
+    networks:
+      - triage-net
+
+volumes:
+  workflow_pgdata:
+  glpi_dbdata:
+  glpi_data:
+
+networks:
+  triage-net:
+    driver: bridge
