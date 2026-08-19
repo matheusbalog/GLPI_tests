@@ -6,3 +6,4 @@ psycopg[binary]>=3.1.18
 langgraph>=0.0.30
 pytest>=8.1.0
 respx>=0.21.0
+python-dotenv>=1.0.0
