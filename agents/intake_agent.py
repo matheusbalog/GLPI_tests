@@ -6,7 +6,7 @@ from tools.glpi_tools import TicketResponse
 
 class TicketClassification(BaseModel):
     """Classificacao estruturada do chamado."""
-    category: Literal["BUG", "FEATURE_REQUEST", "SUPPORT_QUESTION", "UNCLEAR"]
+    category: Literal["BUG", "MELHORIA", "DUVIDA", "INCIDENTE", "SOLICITACAO", "UNCLEAR"]
     confidence: float = Field(ge=0.0, le=1.0)
     summary: str
 
@@ -49,6 +49,9 @@ class IntakeAgent:
         # Heuristica deterministica de classificacao inicial
         bug_keywords = ["erro", "error", "falha", "exception", "500", "404", "bug", "crash", "quebrado"]
         unclear_keywords = ["me ajuda", "nao funciona nada", "urgente", "socorro", "ajuda"]
+        melhoria_keywords = ["otimizar", "melhorar", "sugestão", "atualizar"] #Adicionei melhoria
+        solicitacao_keywords = ["liberar", "fornecer", "configurar"] #Adicionei solicitação
+        incidente_keywords = ["lento", "sem acesso", "travado", "bloqueado"]#Adicionei incidente
 
         if any(kw in combined_text for kw in unclear_keywords) and len(content.split()) < 8:
             return TicketClassification(
@@ -63,11 +66,34 @@ class IntakeAgent:
                 confidence=0.85,
                 summary="Relato identificado como falha ou anomalia tecnica no sistema."
             )
+        #Adiciona melhoria_keywords
+        if any(kw in combined_text for kw in melhoria_keywords):
+            return TicketClassification(
+                category="MELHORIA",
+                confidence=0.85,
+                summary="Relato identificado como melhoria no sistema"
+            )
+        #Adiciona solicitacao_keywords
+        if any(kw in combined_text for kw in solicitacao_keywords):
+            return TicketClassification(
+                category="SOLICITACAO",
+                confidence=0.85,
+                summary="Relato identificado como solicitação"
+            )
+
+        #Adiciona incidente_keywords
+        if any(kw in combined_text for kw in incidente_keywords):
+            return TicketClassification(
+                category="INCIDENTE",
+                confidence=0.85,
+                summary="Relato identificado como incidente"
+            )
+
 
         return TicketClassification(
-            category="SUPPORT_QUESTION",
+            category="DUVIDA",
             confidence=0.6,
-            summary="Duvida operacional ou solicitacao geral."
+            summary="Duvida operacional"
         )
 
     def process_ticket(self, ticket: TicketResponse) -> IntakeResult:
