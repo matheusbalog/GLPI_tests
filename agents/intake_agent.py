@@ -45,7 +45,7 @@ class IntakeAgent:
                     confidence=0.1,
                     summary="Potential adversarial input detected. Marked for clarification/escalation."
                 )
-
+y
         # Heuristica deterministica de classificacao inicial
         bug_keywords = ["erro", "error", "falha", "exception", "500", "404", "bug", "crash", "quebrado"]
         unclear_keywords = ["me ajuda", "nao funciona nada", "urgente", "socorro", "ajuda"]
